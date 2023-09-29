@@ -1,0 +1,9 @@
+Testing/*
+CMakeFiles/*
+.vscode/*
+.VSCodeCounter/*
+
+cmake_install*
+debug.txt
+
+build/*
