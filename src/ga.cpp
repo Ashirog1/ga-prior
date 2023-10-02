@@ -37,6 +37,7 @@ solutionRespent decoding(Chromosome &chr) {
   sol.init_empty();
   // std::cout << "debug ";
   // print_out(chr.chr);
+  // std::cout << '\n';
 
   int current_vehicle = 0, trip_id = 0;
   vehicle_types cur_vehicle_type = TRUCK;
@@ -50,16 +51,19 @@ solutionRespent decoding(Chromosome &chr) {
     while (true) {
       if (current_vehicle >= chr.config.NUM_TRUCK + chr.config.NUM_DRONE)
         break;
-      cur_vehicle_type = (current_vehicle >= chr.config.NUM_TRUCK ? TRUCK : DRONE);
+      cur_vehicle_type = (current_vehicle >= chr.config.NUM_TRUCK ? DRONE : TRUCK);
       double ncur_travel_time = cur_travel_time + chr.config.time_travel(prv_cus, cus, cur_vehicle_type) +
                                 chr.config.time_travel(cus, 0, cur_vehicle_type) -
                                 chr.config.time_travel(prv_cus, 0, cur_vehicle_type);
       double ncur_system_time = cur_system_time - cur_travel_time + ncur_travel_time;
 
+
       /// check valid constraint
       bool next_trip = false;
+
+
       if (current_vehicle < chr.config.NUM_TRUCK) {
-        if (ncur_travel_time < chr.config.TIME_LIMIT) {
+        if (prv_cus != cus and ncur_travel_time < chr.config.TIME_LIMIT) {
           cur_travel_time = ncur_travel_time;
           cur_system_time = ncur_system_time;
           prv_cus = cus;
@@ -69,7 +73,7 @@ solutionRespent decoding(Chromosome &chr) {
           ++current_vehicle;
         }
       } else {
-        if (ncur_travel_time < chr.config.TIME_LIMIT and ncur_system_time < chr.config.DRONE_DURATION) {
+        if (prv_cus != cus and ncur_travel_time < chr.config.TIME_LIMIT and ncur_system_time < chr.config.DRONE_DURATION) {
           cur_travel_time = ncur_travel_time;
           cur_system_time = ncur_system_time;
           prv_cus = cus;
@@ -79,6 +83,8 @@ solutionRespent decoding(Chromosome &chr) {
           ++trip_id;
         }
       }
+      /// make sure to split
+      /// std::cout << cus << ' ' << current_vehicle << ' ' << trip_id << ' ' << next_trip << ' ' << is_empty << '\n';
       if (next_trip) {
         cur_travel_time = 0;
         prv_cus = 0;
@@ -89,14 +95,20 @@ solutionRespent decoding(Chromosome &chr) {
             current_vehicle++;
             trip_id = 0;
             cur_system_time = 0;
+            cur_travel_time = 0;
             is_empty = true;
+          } else {
+            is_empty = true;
+            cur_travel_time = 0;
           }
         }
+      } else {
+        break;
       }
     }
     /// find next trip
     /// append to next trip
-    // std::cout << cus << ' ' << current_vehicle << ' ' << trip_id << '\n';
+    /// std::cout << "found " << cus << ' ' << current_vehicle << ' ' << trip_id << '\n';
     if (current_vehicle >= chr.config.NUM_TRUCK + chr.config.NUM_DRONE)
       break;
     is_empty = false;
@@ -159,6 +171,31 @@ std::pair<double, Chromosome> move_swap_point(Chromosome &chr) {
   return pipeline(chr);
 }
 
+
+// std::pair<double, Chromosome> move_swap_edge(Chromosome &chr) {
+//   /// run pipeline after swap??
+//   if (chr.chr.size() < 2)
+//     return std::make_pair(-1, chr);
+
+//   double v = 0;
+//   Chromosome best(chr);
+
+//   for (int i = 0; i + 1 < chr.chr.size(); ++i) {
+//     for (int j = 0; j < chr.chr.size(); ++j) {
+//       if (j == i or j == i + 1) continue;
+//       auto a = chr;
+//       std::swap(a.chr[i], a.chr[j]);
+
+//       auto tmp = pipeline(a);
+//       if (v < tmp.first) {
+//         v = tmp.first;
+//         best = a;
+//       }
+//     }
+//   }
+//   return pipeline(chr);
+// }
+
 GA::GA(globalSetting &conf) { config = conf; }
 
 void GA::init_population() {
@@ -205,8 +242,9 @@ void GA::choose_next_population() {
 void GA::local_search_mutation() {
   for (int i = 0; i < config.MUT_LOCALSEARCH_ITER; ++i) {
     int r = rng(0, population.size() - 1);
-
-    print_out(population[r].chr);
+    // std::cout << r << '\n';
+    // std::cout << population[r].chr.size() << '\n';
+    // print_out(population[r].chr);
 
     population[r] = local_search(population[r]);
   }
@@ -240,15 +278,14 @@ void GA::mutation_process() {
 void GA::ga_process() {
   init_population();
   for (int i = 0; i < config.GA_ITER; ++i) {
-    std::cout << "start generation " << i << '\n';
+    // std::cout << "start generation " << i << '\n';
     choose_next_population();
-    std::cout << "done next population\n";
+    // std::cout << "done next population\n";
     mutation_process();
-    std::cout << "done mutation\n";
+    // std::cout << "done mutation\n";
 
     if (i % config.MUT_LOCALSEARCH_ITER == 0) {
       local_search_mutation();
-      std::cout << "done localsearch\n";
     }
   }
 }

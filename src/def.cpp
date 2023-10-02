@@ -337,7 +337,7 @@ void solutionRespent::print() {
   for (int i = 0; i < config.NUM_DRONE; ++i) {
     std::cout << "route of drone " << i << '\n';
     for (auto route : drone_route[i]) {
-      print_out(route);
+      print_out(route); std::cout << '\n';
     }
     std::cout << '\n';
   }
