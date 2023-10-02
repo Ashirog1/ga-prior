@@ -43,19 +43,16 @@ inline std::pair<double, Chromosome> pipeline(Chromosome&chr) {
 std::pair<double, Chromosome> move_swap_point(Chromosome&chr);
 
 /// @brief swap u->v and w
-inline std::pair<double, Chromosome> move_swap_edge(Chromosome&chr) {
-  // if (chr.chr.size() < 3) return std::make_pair(-1, chr);
-  // int id1 = rng(0 , chr.chr.size() - 2);
-  // int id2
-  return {0, chr};
-}
-void move_insert_point();
-void move_insert_edge();
+std::pair<double, Chromosome> move_swap_edge(Chromosome&chr);
+
+std::pair<double, Chromosome> move_insert_point(Chromosome&chr);
+
+std::pair<double, Chromosome> move_insert_edge(Chromosome&chr);
 
 inline Chromosome local_search(Chromosome &chr) {
   ///
   auto cur = pipeline(chr);
-  for (int iter = 0; iter < chr.config.MUT_LOCALSEARCH_ITER; ++iter) {
+  for (int iter = 0; iter < chr.config.LOCALSEARCH_ITER; ++iter) {
     auto nxt = move_swap_point(chr);
 
     if (nxt.first > cur.first) {

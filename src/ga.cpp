@@ -1,19 +1,20 @@
 #include "ga.h"
 #include "bits/stdc++.h"
 
-Chromosome::Chromosome(const globalSetting &conf) { config = conf; chr.clear(); }
+Chromosome::Chromosome(const globalSetting &conf) {
+  config = conf;
+  chr.clear();
+}
 
 void Chromosome::push_back(int c) { chr.emplace_back(c); }
 
-bool Chromosome::operator<(Chromosome&oth) {
-  for (int i = 0; i < std::min(chr.size(), oth.chr.size()); ++i){
-    if (chr[i] < oth.chr[i]) return true;
+bool Chromosome::operator<(Chromosome &oth) {
+  for (int i = 0; i < std::min(chr.size(), oth.chr.size()); ++i) {
+    if (chr[i] < oth.chr[i])
+      return true;
   }
   return false;
 }
-
-
-
 
 Chromosome encoding(solutionRespent &sol) {
   Chromosome chr(sol.config);
@@ -47,7 +48,8 @@ solutionRespent decoding(Chromosome &chr) {
   for (auto cus : chr.chr) {
     /// std::cout << cus << ' ';
     while (true) {
-      if(current_vehicle >= chr.config.NUM_TRUCK + chr.config.NUM_DRONE) break;
+      if (current_vehicle >= chr.config.NUM_TRUCK + chr.config.NUM_DRONE)
+        break;
       cur_vehicle_type = (current_vehicle >= chr.config.NUM_TRUCK ? TRUCK : DRONE);
       double ncur_travel_time = cur_travel_time + chr.config.time_travel(prv_cus, cus, cur_vehicle_type) +
                                 chr.config.time_travel(cus, 0, cur_vehicle_type) -
@@ -95,7 +97,8 @@ solutionRespent decoding(Chromosome &chr) {
     /// find next trip
     /// append to next trip
     // std::cout << cus << ' ' << current_vehicle << ' ' << trip_id << '\n';
-    if(current_vehicle >= chr.config.NUM_TRUCK + chr.config.NUM_DRONE) break;
+    if (current_vehicle >= chr.config.NUM_TRUCK + chr.config.NUM_DRONE)
+      break;
     is_empty = false;
     if (current_vehicle < chr.config.NUM_TRUCK) {
       sol.truck_route[current_vehicle].emplace_back(cus, 0);
@@ -103,12 +106,13 @@ solutionRespent decoding(Chromosome &chr) {
       if (trip_id == sol.drone_route[current_vehicle - chr.config.NUM_TRUCK].size()) {
         std::vector<std::pair<int, int>> r;
         sol.drone_route[current_vehicle - chr.config.NUM_TRUCK].push_back(r);
-      } 
+      }
       if (trip_id > sol.drone_route[current_vehicle - chr.config.NUM_TRUCK].size())
         break;
       // std::cout << "drone\n";
       // std::cout << current_vehicle << '\n';
-      // std::cout << "trip_id" << ' ' << trip_id << ' ' << sol.drone_route[current_vehicle - chr.config.NUM_TRUCK].size() << '\n';
+      // std::cout << "trip_id" << ' ' << trip_id << ' ' << sol.drone_route[current_vehicle -
+      // chr.config.NUM_TRUCK].size() << '\n';
       sol.drone_route[current_vehicle - chr.config.NUM_TRUCK][trip_id].emplace_back(cus, 0);
       // std::cout << "drone\n";
     }
@@ -118,7 +122,7 @@ solutionRespent decoding(Chromosome &chr) {
   return sol;
 }
 
-Chromosome crossover_onepoint(const Chromosome&a, const Chromosome&b) {
+Chromosome crossover_onepoint(const Chromosome &a, const Chromosome &b) {
   int pivot = rng(0, std::min(a.chr.size(), b.chr.size()));
 
   Chromosome ret(a.config);
@@ -132,14 +136,16 @@ Chromosome crossover_onepoint(const Chromosome&a, const Chromosome&b) {
   return ret;
 }
 
-std::pair<double, Chromosome> move_swap_point(Chromosome&chr) {
+std::pair<double, Chromosome> move_swap_point(Chromosome &chr) {
   /// run pipeline after swap??
-  if (chr.chr.size() < 2) return std::make_pair(-1, chr);
+  if (chr.chr.size() < 2)
+    return std::make_pair(-1, chr);
 
-  double v = 0; Chromosome best(chr);
+  double v = 0;
+  Chromosome best(chr);
 
-  for (int i= 0; i < chr.chr.size(); ++i) {
-    for(int j = i + 1; j < chr.chr.size(); ++j) {
+  for (int i = 0; i < chr.chr.size(); ++i) {
+    for (int j = i + 1; j < chr.chr.size(); ++j) {
       auto a = chr;
       std::swap(a.chr[i], a.chr[j]);
 
@@ -150,7 +156,6 @@ std::pair<double, Chromosome> move_swap_point(Chromosome&chr) {
       }
     }
   }
-
   return pipeline(chr);
 }
 
@@ -171,11 +176,11 @@ void GA::choose_next_population() {
   for (auto &chr : population) {
     val.emplace_back(pipeline(chr));
   }
-  std::sort(val.begin(), val.end(), [](std::pair<double, Chromosome>a, std::pair<double, Chromosome>b){
-    return a.first > b.first;
-  });
+  std::sort(val.begin(), val.end(),
+            [](std::pair<double, Chromosome> a, std::pair<double, Chromosome> b) { return a.first > b.first; });
 
-  while (val.size() > config.ELITE_SET) val.pop_back();
+  while (val.size() > config.ELITE_SET)
+    val.pop_back();
 
   population.clear();
 
@@ -197,10 +202,12 @@ void GA::choose_next_population() {
   }
 }
 
-  void GA::local_search_mutation() {
+void GA::local_search_mutation() {
   for (int i = 0; i < config.MUT_LOCALSEARCH_ITER; ++i) {
     int r = rng(0, population.size() - 1);
-    
+
+    print_out(population[r].chr);
+
     population[r] = local_search(population[r]);
   }
 }
@@ -233,11 +240,15 @@ void GA::mutation_process() {
 void GA::ga_process() {
   init_population();
   for (int i = 0; i < config.GA_ITER; ++i) {
+    std::cout << "start generation " << i << '\n';
     choose_next_population();
+    std::cout << "done next population\n";
     mutation_process();
+    std::cout << "done mutation\n";
 
     if (i % config.MUT_LOCALSEARCH_ITER == 0) {
       local_search_mutation();
+      std::cout << "done localsearch\n";
     }
   }
 }

@@ -50,7 +50,16 @@ namespace testing {
 
     std::cout << pipeline(ga.population[0]).first << ' ';
   }
+
+  void test_localsearch() {
+    globalSetting config;
+    config.read_input();
+
+
+
+  }
 };
+
 
 int main(int argc, char **argv) {
   /// handle argv

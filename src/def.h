@@ -67,6 +67,7 @@ public:
   void repair_flow();
   void push_remain_cus();
   double evaluate();
+  double fitness();
   bool is_valid();
   void print();
   void local_search();

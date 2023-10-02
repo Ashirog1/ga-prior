@@ -303,13 +303,26 @@ void solutionRespent::push_remain_cus() {
 }
 
 double solutionRespent::evaluate() {
-  /// make sure to do some educate (pushed flow) before run eval
+  /// make sure to run pipelines before run eval
 
   double ret = 0;
   for (int i = 0; i < config.NUM_CUSTOMER; ++i) {
     ret += (double)current_deliver[i] * config.CUSTOMERS[i].cost;
   }
   return ret;
+}
+
+double solutionRespent::fitness() {
+  double truck_travel_time = 0, drone_travel_time = 0;
+  for (int i = 0; i < config.NUM_TRUCK; ++i) {
+    truck_travel_time += travel_time(truck_route[i], TRUCK, config);
+  }
+  for (int i = 0; i < config.NUM_DRONE; ++i) {
+    for (int r = 0; r < drone_route[i].size(); ++r) {
+      drone_travel_time += travel_time(drone_route[i][r], DRONE, config);
+    }
+  }
+  return evaluate() - truck_travel_time * config.WDTRUCK - drone_travel_time * config.WDDRONE;
 }
 
 bool solutionRespent::is_valid() { return false; }
