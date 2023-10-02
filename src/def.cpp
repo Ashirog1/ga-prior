@@ -325,7 +325,20 @@ double solutionRespent::fitness() {
   return evaluate() - truck_travel_time * config.WDTRUCK - drone_travel_time * config.WDDRONE;
 }
 
-bool solutionRespent::is_valid() { return false; }
+bool solutionRespent::is_valid() {
+  for (int i = 0; i < config.NUM_TRUCK; ++i)  {
+    if (travel_time(truck_route[i], TRUCK, config) > config.TIME_LIMIT) return false;
+  }
+  for (int i = 0; i < config.NUM_DRONE; ++i) {
+    double drone_travel_time = 0;
+    for (int r = 0; r < drone_route[i].size(); ++r) {
+      int tmp = travel_time(drone_route[i][r], DRONE, config);
+      drone_travel_time += tmp;
+    }
+    if (drone_travel_time > config.DRONE_DURATION) return false;
+  }
+  return true;
+}
 
 void solutionRespent::print() {
   std::cout << "truck route \n";
