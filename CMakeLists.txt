@@ -6,6 +6,6 @@ enable_testing()
 
 add_executable(ga-priority main.cpp src/ga.cpp src/def.cpp)
 
-set(CPACK_PROJECT_NAME ${PROJECT_NAME})
-set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
-include(CPack)
+# set(CPACK_PROJECT_NAME ${PROJECT_NAME})
+# set(CPACK_PROJECT_VERSION ${PROJECT_VERSION})
+# include(CPack)
