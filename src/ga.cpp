@@ -205,6 +205,7 @@ void GA::init_population() {
     sol.init_by_distance();
     population.push_back(encoding(sol));
   }
+  std::cout << "vcl";
 }
 
 void GA::choose_next_population() {
