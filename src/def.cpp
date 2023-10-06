@@ -110,23 +110,33 @@ void solutionRespent::init_by_distance() {
         for (int cus = 1; cus < config.NUM_CUSTOMER; ++cus) {
           if (current_deliver[cus] >= config.CUSTOMERS[cus].lower_weight)
             continue;
-          if (min_distance > config.time_travel(tmp, cus, vehicle_type) + config.time_travel(cus, 0, vehicle_type)) {
+          /*if (min_distance > config.time_travel(tmp, cus, vehicle_type) + config.time_travel(cus, 0, vehicle_type)) {
             min_distance = config.time_travel(tmp, cus, vehicle_type) + config.time_travel(cus, 0, vehicle_type);
+            next_cus = cus;
+          }*/
+          if(travel_time+config.time_travel(tmp,cus,vehicle_type)+config.time_travel(cus,0,vehicle_type)>time_travel_limit)
+            continue;
+          if (min_distance > config.time_travel(tmp, cus, vehicle_type) ) {
+            min_distance = config.time_travel(tmp, cus, vehicle_type) ;
             next_cus = cus;
           }
         }
       }
       /// find next customer minimum distance
       if (next_cus == -1)
+      {
+        travel_time += config.time_travel(tmp, 0, vehicle_type);
         break;
+      }
+        
       /// check valid time constraint
-      double ntravel_time = travel_time + config.time_travel(tmp, next_cus, vehicle_type) +
+    /*  double ntravel_time = travel_time + config.time_travel(tmp, next_cus, vehicle_type) +
                             config.time_travel(next_cus, 0, vehicle_type) - config.time_travel(tmp, 0, vehicle_type);
       if (ntravel_time > time_travel_limit)
-        break;
+        break;*/
+      travel_time = travel_time + config.time_travel(tmp, next_cus, vehicle_type);
       tmp = next_cus;
-      travel_time = ntravel_time;
-
+      // travel_time = ntravel_time;
       route.emplace_back(next_cus, 0);
       int weight = std::min(truck_weight, config.CUSTOMERS[next_cus].lower_weight - current_deliver[next_cus]);
       current_deliver[next_cus] += weight;
