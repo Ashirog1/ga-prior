@@ -64,8 +64,9 @@ namespace testing {
     config.read_input();
 
     Chromosome chr(config);
-    chr.chr = {1, 2, 6, 5, 3, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 1, 1, 1, 1};
+    chr = {1, 2, 6, 5, 3, 4, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 1, 1, 1, 1};
 
+    /// giong init cu 
     auto sol = decoding(chr);
     sol.print();
   }

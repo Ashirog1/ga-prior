@@ -158,6 +158,7 @@ void solutionRespent::init_by_distance() {
       if (route.empty() or travel_time == 0)
         break;
       drone_route[i].push_back(route);
+      system_limit += travel_time;
     }
   }
 }

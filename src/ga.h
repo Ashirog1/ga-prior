@@ -9,12 +9,12 @@
 
 class Chromosome {
 public:
-  std::vector<int> chr; 
+  std::vector<std::pair<int, int>> chr; 
   globalSetting config;
   Chromosome(const globalSetting&conf);
   void push_back(int c);
   bool operator < (Chromosome&oth);
-
+  Chromosome& operator=(const std::vector<int> &other);
 };
 
 Chromosome encoding(solutionRespent &sol);
@@ -48,6 +48,10 @@ std::pair<double, Chromosome> move_swap_edge(Chromosome&chr);
 std::pair<double, Chromosome> move_insert_point(Chromosome&chr);
 
 std::pair<double, Chromosome> move_insert_edge(Chromosome&chr);
+
+std::pair<double, Chromosome> move_duplicate(Chromosome&chr);
+
+std::pair<double, Chromosome> move_erase(Chromosome&chr);
 
 inline Chromosome local_search(Chromosome &chr) {
   ///
@@ -114,7 +118,7 @@ inline Chromosome mutation_ins(const Chromosome&chr) {
 
   int i = rng(0, chr.chr.size());
 
-  ret.chr.insert(ret.chr.begin() + i, cus);
+  ret.chr.insert(ret.chr.begin() + i, {cus, 0});
   return chr;
 }
 

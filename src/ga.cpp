@@ -6,7 +6,14 @@ Chromosome::Chromosome(const globalSetting &conf) {
   chr.clear();
 }
 
-void Chromosome::push_back(int c) { chr.emplace_back(c); }
+Chromosome& Chromosome::operator=(const std::vector<int>& other) {
+  for (auto v : other) {
+    chr.emplace_back(v, 0);
+  }
+  return *this;
+}
+
+void Chromosome::push_back(int c) { chr.emplace_back(c, 0); }
 
 bool Chromosome::operator<(Chromosome &oth) {
   for (int i = 0; i < std::min(chr.size(), oth.chr.size()); ++i) {
@@ -20,12 +27,12 @@ Chromosome encoding(solutionRespent &sol) {
   Chromosome chr(sol.config);
   for (auto truck : sol.truck_route)
     for (auto cus : truck)
-      chr.push_back(cus.first);
+      chr.chr.push_back(cus);
 
   for (auto drone : sol.drone_route) {
     for (auto route : drone)
       for (auto cus : route) {
-        chr.push_back(cus.first);
+        chr.chr.push_back(cus);
       }
   }
   return chr;
@@ -46,8 +53,9 @@ solutionRespent decoding(Chromosome &chr) {
   int prv_cus = 0;
   bool is_empty = true;
 
-  for (auto cus : chr.chr) {
+  for (auto gen : chr.chr) {
     /// std::cout << cus << ' ';
+    auto cus = gen.first;
     while (true) {
       if (current_vehicle >= chr.config.NUM_TRUCK + chr.config.NUM_DRONE)
         break;
@@ -168,7 +176,54 @@ std::pair<double, Chromosome> move_swap_point(Chromosome &chr) {
       }
     }
   }
-  return pipeline(chr);
+  return pipeline(best);
+}
+
+std::pair<double, Chromosome> move_swap_edge(Chromosome &chr) {
+  double v = 0;
+  Chromosome best(chr);
+  for (int i = 0; i < chr.chr.size(); ++i) {
+    for (int j = i + 2; j + 1 < chr.chr.size(); ++j) {
+      auto a = chr;
+
+      std::swap(a.chr[i], a.chr[j]);
+      std::swap(a.chr[i + 1], a.chr[j + 1]);
+      auto tmp = pipeline(a);
+      if (v < tmp.first) {
+        v = tmp.first;
+        best = a;
+      }
+    }
+  }
+  return pipeline(best);
+}
+
+std::pair<double, Chromosome> move_duplicate(Chromosome&chr) {
+  chr = pipeline(chr).second;
+  double v = 0;
+  Chromosome best(chr);
+
+  for (int i = 0; i < chr.chr.size(); ++i) {
+    for (int j = 0; j < chr.chr.size(); ++j) {
+      if (i == j) continue;
+
+      auto a = chr;
+
+      if (chr.chr[i].second > chr.chr[j].second) {
+        std::swap(a.chr[i].first, a.chr[j].first);
+        a.chr[i].second -= a.chr[j].second;
+        a.chr.insert(a.chr.begin() + i, a.chr[j]);
+
+        auto tmp = pipeline(a);
+        if (v < tmp.first) {
+          v = tmp.first;
+          best = a;
+        }
+
+      }
+    }
+  }
+  return pipeline(best);
 }
 
 
