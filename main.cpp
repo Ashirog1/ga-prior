@@ -45,17 +45,18 @@ namespace testing {
     globalSetting config;
     config.read_input();
 
+
     GA ga(config);
     ga.ga_process();
-
+    auto sol = decoding(ga.population[0]);
+    sol.print();
+    
     std::cout << pipeline(ga.population[0]).first << ' ';
   }
 
   void test_localsearch() {
     globalSetting config;
     config.read_input();
-
-
 
   }
 

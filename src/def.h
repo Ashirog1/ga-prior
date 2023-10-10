@@ -30,7 +30,7 @@ public:
 
   int LOCALSEARCH_ITER = 5;
   int ELITE_SET = 30, MUT_SIZE = 10;
-  double WDTRUCK, WDDRONE;
+  double WDTRUCK = 1.0, WDDRONE = 1.0;
 
   int limit_weight(vehicle_types vehicle_type);
 
