@@ -33,13 +33,32 @@ bool Chromosome::operator<(Chromosome &oth) {
 Chromosome encoding(solutionRespent &sol) {
   Chromosome chr(sol.config);
   for (auto truck : sol.truck_route)
-    for (auto cus : truck)
-      chr.chr.push_back(cus);
+    for (auto cus : truck) {
+      if (cus.second != 0)
+        chr.chr.push_back(cus);
+    }
 
   for (auto drone : sol.drone_route) {
     for (auto route : drone)
       for (auto cus : route) {
+        if (cus.second != 0)
+          chr.chr.push_back(cus);
+      }
+  }
+  return chr;
+}
+
+Chromosome encoding_norm(solutionRespent &sol) {
+  Chromosome chr(sol.config);
+  for (auto truck : sol.truck_route)
+    for (auto cus : truck) {
         chr.chr.push_back(cus);
+    }
+
+  for (auto drone : sol.drone_route) {
+    for (auto route : drone)
+      for (auto cus : route) {
+          chr.chr.push_back(cus);
       }
   }
   return chr;
@@ -280,7 +299,7 @@ std::pair<double, Chromosome> move_swap_point(Chromosome &chr) {
       auto a = chr;
       std::swap(a.chr[i], a.chr[j]);
 
-      auto tmp = decoding(a);
+      auto tmp = decode_with_weight(a);
       if (v < tmp.fitness()) {
         v = tmp.fitness();
         best = a;
@@ -312,6 +331,7 @@ std::pair<double, Chromosome> move_swap_edge(Chromosome &chr) {
 std::pair<double, Chromosome> move_duplicate(Chromosome &chr) {
   chr = pipeline(chr).second;
   double v = 0;
+  std::cout << chr.chr.size() << '\n';
   Chromosome best(chr);
 
   for (int i = 0; i < chr.chr.size(); ++i) {
@@ -342,6 +362,8 @@ std::pair<double, Chromosome> move_erase(Chromosome &chr) {
   double v = 0;
   Chromosome best(chr);
 
+  std::cerr << chr.chr.size() << '\n';
+
   for (int i = 0; i < chr.chr.size(); ++i) {
     for (int j = 0; j < chr.chr.size(); ++j) {
       for (int k = 0; k < chr.chr.size(); ++k) {
@@ -359,12 +381,13 @@ std::pair<double, Chromosome> move_erase(Chromosome &chr) {
         a.chr.erase(a.chr.begin() + k);
 
         a.chr.insert(a.chr.begin() + i + 1, chr.chr[k]);
-        a.chr.insert(a.chr.begin() + j + 1, chr.chr[k]);
+        a.chr.insert(a.chr.begin() + j + 1 + (i < j), chr.chr[k]);
 
         auto tmp = decode_with_weight(a);
         if (v < tmp.fitness()) {
           v = tmp.fitness();
           best = a;
+          // return pispeline(best);
         }
       }
     }

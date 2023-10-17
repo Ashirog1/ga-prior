@@ -19,6 +19,7 @@ public:
 };
 
 Chromosome encoding(solutionRespent &sol);
+Chromosome encoding_norm(solutionRespent &sol);
 
 solutionRespent decoding(Chromosome &chr);
 
@@ -31,12 +32,12 @@ inline std::pair<double, Chromosome> pipeline(Chromosome&chr) {
   sol.repair_flow();
 
   /// sol.print(); std::cout << '\n';
-
+  // std::cout << chr.chr.size() << '\n';
   sol.push_remain_cus();
 
   sol.repair_flow();
 
-  if (not sol.is_valid()) return {sol.fitness() - INT_MAX, encoding(sol) };
+  if (not sol.is_valid()) return {sol.fitness() - INT_MAX, encoding_norm(sol) };
 
   return {sol.fitness(), encoding(sol)};
 }
@@ -74,7 +75,7 @@ inline Chromosome local_search(Chromosome &chr) {
       nxt = nxt2;
     }
 
-    // nxt2 = move_duplicate(chr);
+    nxt2 = move_duplicate(chr);
     if (nxt2.first > nxt.first) {
       nxt = nxt2;
     }
