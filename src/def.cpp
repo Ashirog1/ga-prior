@@ -76,6 +76,7 @@ void solutionRespent::init_empty() {
   drone_route.resize(config.NUM_DRONE);
   current_deliver.resize(config.NUM_CUSTOMER, 0);
 }
+/// @brief init by angle
 
 void solutionRespent::init_by_distance() {
   init_empty();

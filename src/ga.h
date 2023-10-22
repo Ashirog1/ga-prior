@@ -32,7 +32,7 @@ inline std::pair<double, Chromosome> pipeline(Chromosome&chr) {
 
   sol.repair_flow();
 
-  return {sol.evaluate(), encoding(sol)};
+  return {sol.evaluate(), encoding_norm(sol)};
 }
 
 
@@ -58,6 +58,24 @@ inline Chromosome local_search(Chromosome &chr) {
   auto cur = pipeline(chr);
   for (int iter = 0; iter < chr.config.LOCALSEARCH_ITER; ++iter) {
     auto nxt = move_swap_point(chr);
+    
+    auto nxt2 = move_swap_edge(chr);
+
+    // print_out(nxt.second.chr); std::cout << '\n';
+    // print_out(nxt2.second.chr); std::cout << '\n';
+    if (nxt2.first > nxt.first) {
+      nxt = nxt2;
+    }
+
+    nxt2 = move_duplicate(chr);
+    if (nxt2.first > nxt.first) {
+      nxt = nxt2;
+    }
+
+    nxt2 = move_erase(chr);
+    if (nxt2.first > nxt.first) {
+      nxt = nxt2;
+    }
 
     if (nxt.first > cur.first) {
       cur.second = nxt.second;
@@ -121,9 +139,6 @@ inline Chromosome mutation_ins(const Chromosome&chr) {
   ret.chr.insert(ret.chr.begin() + i, {cus, 0});
   return chr;
 }
-
-
-
 
 class GA {
 public:
