@@ -13,13 +13,18 @@ public:
   globalSetting config;
   Chromosome(const globalSetting&conf);
   void push_back(int c);
+  void push_back(std::pair<int, int> c);
   bool operator < (Chromosome&oth);
   Chromosome& operator=(const std::vector<int> &other);
 };
 
 Chromosome encoding(solutionRespent &sol);
+Chromosome encoding_norm(solutionRespent &sol);
 
 solutionRespent decoding(Chromosome &chr);
+
+
+solutionRespent decode_with_weight(Chromosome &chr);
 
 inline std::pair<double, Chromosome> pipeline(Chromosome&chr) {
   solutionRespent sol = decoding(chr);
@@ -27,12 +32,15 @@ inline std::pair<double, Chromosome> pipeline(Chromosome&chr) {
   sol.repair_flow();
 
   /// sol.print(); std::cout << '\n';
-
+  // std::cout << chr.chr.size() << '\n';
   sol.push_remain_cus();
 
   sol.repair_flow();
 
   return {sol.evaluate(), encoding_norm(sol)};
+  if (not sol.is_valid()) return {sol.fitness() - INT_MAX, encoding_norm(sol) };
+
+  return {sol.fitness(), encoding(sol)};
 }
 
 
@@ -57,28 +65,11 @@ inline Chromosome local_search(Chromosome &chr) {
   ///
   auto cur = pipeline(chr);
   for (int iter = 0; iter < chr.config.LOCALSEARCH_ITER; ++iter) {
+
     auto nxt = move_swap_point(chr);
-    
-    auto nxt2 = move_swap_edge(chr);
-
-    // print_out(nxt.second.chr); std::cout << '\n';
-    // print_out(nxt2.second.chr); std::cout << '\n';
-    if (nxt2.first > nxt.first) {
-      nxt = nxt2;
-    }
-
-    nxt2 = move_duplicate(chr);
-    if (nxt2.first > nxt.first) {
-      nxt = nxt2;
-    }
-
-    nxt2 = move_erase(chr);
-    if (nxt2.first > nxt.first) {
-      nxt = nxt2;
-    }
 
     if (nxt.first > cur.first) {
-      cur.second = nxt.second;
+      cur = nxt;
     }
   }
   return cur.second;
