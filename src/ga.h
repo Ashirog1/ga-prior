@@ -30,15 +30,16 @@ inline std::pair<double, Chromosome> pipeline(Chromosome&chr) {
   solutionRespent sol = decoding(chr);
   
   sol.repair_flow();
-
   /// sol.print(); std::cout << '\n';
   // std::cout << chr.chr.size() << '\n';
   sol.push_remain_cus();
 
   sol.repair_flow();
 
-  return {sol.evaluate(), encoding_norm(sol)};
-  if (not sol.is_valid()) return {sol.fitness() - INT_MAX, encoding_norm(sol) };
+  sol.normalize();
+
+
+  if (not sol.is_valid()) return {sol.fitness() - 10000000,encoding(sol) };
 
   return {sol.fitness(), encoding(sol)};
 }
@@ -48,31 +49,35 @@ inline std::pair<double, Chromosome> pipeline(Chromosome&chr) {
 /// local seearch util
 
 
-std::pair<double, Chromosome> move_swap_point(Chromosome&chr);
+std::pair<double, solutionRespent> move_swap_point(solutionRespent&chr);
 
 /// @brief swap u->v and w
-std::pair<double, Chromosome> move_swap_edge(Chromosome&chr);
+std::pair<double, solutionRespent> move_swap_edge(solutionRespent&chr);
 
-std::pair<double, Chromosome> move_insert_point(Chromosome&chr);
+std::pair<double, solutionRespent> move_insert_point(solutionRespent&chr);
 
-std::pair<double, Chromosome> move_insert_edge(Chromosome&chr);
+std::pair<double, solutionRespent> move_insert_edge(solutionRespent&chr);
 
-std::pair<double, Chromosome> move_duplicate(Chromosome&chr);
+std::pair<double, solutionRespent> move_duplicate(solutionRespent&chr);
 
-std::pair<double, Chromosome> move_erase(Chromosome&chr);
+std::pair<double, solutionRespent> move_erase(solutionRespent&chr);
 
 inline Chromosome local_search(Chromosome &chr) {
   ///
-  auto cur = pipeline(chr);
-  for (int iter = 0; iter < chr.config.LOCALSEARCH_ITER; ++iter) {
+  solutionRespent sol = decoding(chr);
+  sol.repair_flow(); sol.push_remain_cus(); sol.repair_flow();
+  while (true) {
+    auto tmp = sol.fitness();
 
-    auto nxt = move_swap_point(chr);
+    auto nxt1 = move_swap_point(sol);
+    // auto nxt2 = move_duplicate(sol);
 
-    if (nxt.first > cur.first) {
-      cur = nxt;
-    }
+    // if (nxt1.first < nxt2.first) std::swap(nxt1, nxt2);
+    sol = nxt1.second;
+    if (nxt1.first <= tmp) break;
+
   }
-  return cur.second;
+  return encoding(sol);
 }
 
 inline Chromosome mutation_swap(const Chromosome&chr) {

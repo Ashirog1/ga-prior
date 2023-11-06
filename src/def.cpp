@@ -33,33 +33,14 @@ double globalSetting::time_travel(const int &a, const int &b, vehicle_types vehi
 
 void globalSetting::read_input() {
   // std::ifstream in("input.txt");
-
-  std::cin >> NUM_CUSTOMER >> TRUCK_CAPACITY;
-
-  NUM_TRUCK = NUM_CUSTOMER + 5;
-  NUM_DRONE = 0;
-  TRUCK_SPEED = 1;
-  DRONE_SPEED = 0; // make sure never use drone
+  std::cin >> NUM_TRUCK >> NUM_DRONE >> TIME_LIMIT;
+  std::cin >> TRUCK_SPEED >> DRONE_SPEED >> TRUCK_CAPACITY >> DRONE_CAPACITY >> DRONE_DURATION;
   Customer tmp;
-
-  TIME_LIMIT = 10000000;
-
-  NUM_CUSTOMER++;
-
-  CUSTOMERS.resize(NUM_CUSTOMER);
-
-  for (int i = 1; i < NUM_CUSTOMER; ++i) {
-    std::cin >> CUSTOMERS[i].lower_weight;
-
-    CUSTOMERS[i].upper_weight = CUSTOMERS[i].lower_weight;
-
-    CUSTOMERS[i].cost = 1;
-  }
-
-  for (int i = 0; i < NUM_CUSTOMER; ++i) {
-    std::cin >> CUSTOMERS[i].x >> CUSTOMERS[i].y;
-
-    // std::cout <<CUSTOMERS[i].x << ' '  << CUSTOMERS[i].y << '\n';
+  NUM_CUSTOMER = 1;
+  CUSTOMERS.emplace_back(Customer());
+  while (std::cin >> tmp.x >> tmp.y >> tmp.lower_weight >> tmp.upper_weight >> tmp.cost) {
+    CUSTOMERS.emplace_back(tmp);
+    NUM_CUSTOMER++;
   }
 }
 
@@ -251,12 +232,18 @@ void solutionRespent::repair_flow() {
 
 void solutionRespent::push_remain_cus() {
   for (int i = 1; i < config.NUM_CUSTOMER; ++i) {
-    if (current_deliver[i] < config.CUSTOMERS[i].upper_weight) {
-      int rem_weight = config.CUSTOMERS[i].upper_weight - current_deliver[i];
+    if (current_deliver[i] < config.CUSTOMERS[i].lower_weight) {
+      int rem_weight = config.CUSTOMERS[i].lower_weight - current_deliver[i];
       while (rem_weight > 0) {
         /// find route to insert?
         int prv_weight = rem_weight;
+        std::vector<std::pair<int, int>> truck_list;
         for (int t = 0; t < config.NUM_TRUCK; ++t) {
+          truck_list.emplace_back(weight_truck[t], t);
+        }
+        std::sort(truck_list.begin(), truck_list.end());
+
+        for (auto [_, t] : truck_list) {
           if (weight_truck[t] >= config.TRUCK_CAPACITY)
             continue;
 
@@ -297,6 +284,97 @@ void solutionRespent::push_remain_cus() {
         /// do the same thing for drone
         /// TODO:
         /// create new drone route?
+        if (rem_weight == 0)
+          continue;
+        for (int d = 0; d < config.NUM_DRONE; ++d) {
+          /// calculate existed system limit wheight
+          /// std::cout << d << ' ';
+          double system_time = 0;
+          int exist_empty_route = -1;
+          for (int r = 0; r < drone_route[d].size(); ++r) {
+            if (drone_route[d][r].empty())
+              exist_empty_route = r;
+            system_time += travel_time(drone_route[d][r], DRONE, config);
+          }
+
+          std::vector<std::pair<int, int>> r;
+
+          if (system_time + 2.0 * config.time_travel(0, i, DRONE) < config.DRONE_DURATION and
+              2.0 * config.time_travel(0, i, DRONE) < config.TIME_LIMIT) {
+            int pushed_weight = std::min(rem_weight, config.DRONE_CAPACITY);
+            r.emplace_back(i, pushed_weight);
+
+            rem_weight -= pushed_weight;
+
+            current_deliver[i] += pushed_weight;
+            if (exist_empty_route == -1)
+              drone_route[d].emplace_back(r);
+            else
+              drone_route[d][exist_empty_route] = r;
+          }
+
+          // print_out(r); std::cout << '\n';
+        }
+        if (rem_weight == prv_weight)
+          break;
+      }
+    }
+  }
+  for (int i = 1; i < config.NUM_CUSTOMER; ++i) {
+    if (current_deliver[i] < config.CUSTOMERS[i].upper_weight) {
+      int rem_weight = config.CUSTOMERS[i].upper_weight - current_deliver[i];
+      while (rem_weight > 0) {
+        /// find route to insert?
+        int prv_weight = rem_weight;
+        std::vector<std::pair<int, int>> truck_list;
+        for (int t = 0; t < config.NUM_TRUCK; ++t) {
+          truck_list.emplace_back(weight_truck[t], t);
+        }
+        std::sort(truck_list.begin(), truck_list.end());
+
+        for (auto [_, t] : truck_list) {
+          if (weight_truck[t] >= config.TRUCK_CAPACITY)
+            continue;
+
+          if (truck_route[t].size() == 0) {
+            int pushed_weight = std::min(rem_weight, config.TRUCK_CAPACITY);
+            truck_route[t].emplace_back(i, std::min(rem_weight, config.TRUCK_CAPACITY));
+
+            rem_weight -= pushed_weight;
+            weight_truck[t] += pushed_weight;
+            current_deliver[i] += pushed_weight;
+            continue;
+          }
+
+          int ind = 0;
+          double min_added = insert(0, truck_route[t][0].first, i, TRUCK, config);
+          int cur_weight = 0;
+          for (int i = 0; i < truck_route[t].size(); ++i) {
+            cur_weight += truck_route[t][i].second;
+            int nxt = (i + 1 < truck_route[t].size() ? truck_route[t][i].first : 0);
+            double cur_add = insert(truck_route[t][i].first, nxt, i, TRUCK, config);
+            if (min_added > cur_add) {
+              min_added = cur_add;
+              ind = i;
+            }
+          }
+          if (travel_time(truck_route[t], TRUCK, config) + min_added < config.TIME_LIMIT) {
+            int pushed_weight = std::min(rem_weight, config.TRUCK_CAPACITY - weight_truck[t]);
+            truck_route[t].insert(truck_route[t].begin() + ind, {i, pushed_weight});
+
+            rem_weight -= pushed_weight;
+            weight_truck[t] += pushed_weight;
+
+            current_deliver[i] += pushed_weight;
+          }
+        }
+        /// std::cout << i << ' ' << rem_weight << '\n';
+
+        /// do the same thing for drone
+        /// TODO:
+        /// create new drone route?
+        if (rem_weight == 0)
+          continue;
         for (int d = 0; d < config.NUM_DRONE; ++d) {
           /// calculate existed system limit wheight
           /// std::cout << d << ' ';
@@ -333,6 +411,31 @@ void solutionRespent::push_remain_cus() {
   }
 }
 
+void solutionRespent::normalize() {
+  for (int i = 0; i < config.NUM_TRUCK; ++i) {
+    std::vector<std::pair<int, int>> v;
+    for (auto c : truck_route[i]) {
+      if (c.second == 0) {
+      } else {
+        v.emplace_back(c);
+      }
+    }
+    truck_route[i] = v;
+  }
+  for (int i = 0; i < config.NUM_DRONE; ++i) {
+    for (int t = 0; t < drone_route[i].size(); ++t) {
+      std::vector<std::pair<int, int>> v;
+      for (auto c : drone_route[i][t]) {
+        if (c.second == 0) {
+        } else {
+          v.emplace_back(c);
+        }
+      }
+      drone_route[i][t] = v;
+    }
+  }
+}
+
 double solutionRespent::evaluate() {
   /// make sure to run pipelines before run eval
 
@@ -353,10 +456,11 @@ double solutionRespent::fitness() {
       drone_travel_time += travel_time(drone_route[i][r], DRONE, config);
     }
   }
-  return -truck_travel_time * config.WDTRUCK - drone_travel_time * config.WDDRONE;
+  return evaluate() -truck_travel_time * config.WDTRUCK - drone_travel_time * config.WDDRONE;
 }
 
 bool solutionRespent::is_valid() {
+  repair_flow();
   for (int i = 1; i < config.NUM_CUSTOMER; ++i) {
     if (current_deliver[i] < config.CUSTOMERS[i].lower_weight)
       return false;
@@ -373,6 +477,7 @@ bool solutionRespent::is_valid() {
     for (int r = 0; r < drone_route[i].size(); ++r) {
       int tmp = travel_time(drone_route[i][r], DRONE, config);
       drone_travel_time += tmp;
+      if (tmp > config.TIME_LIMIT) return false;
     }
     if (drone_travel_time > config.DRONE_DURATION)
       return false;

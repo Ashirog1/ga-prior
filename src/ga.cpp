@@ -13,12 +13,15 @@ Chromosome &Chromosome::operator=(const std::vector<int> &other) {
   return *this;
 }
 
-void Chromosome::push_back(int c) { 
-  if (chr.size() >= 20) return;
-  chr.emplace_back(c, 0); }
-  
-void Chromosome::push_back(std::pair<int,int> c) { 
-  if (chr.size() >= 20) return;
+void Chromosome::push_back(int c) {
+  if (chr.size() >= 20)
+    return;
+  chr.emplace_back(c, 0);
+}
+
+void Chromosome::push_back(std::pair<int, int> c) {
+  if (chr.size() >= 20)
+    return;
   chr.emplace_back(c);
 }
 
@@ -52,13 +55,13 @@ Chromosome encoding_norm(solutionRespent &sol) {
   Chromosome chr(sol.config);
   for (auto truck : sol.truck_route)
     for (auto cus : truck) {
-        chr.chr.push_back(cus);
+      chr.chr.push_back(cus);
     }
 
   for (auto drone : sol.drone_route) {
     for (auto route : drone)
       for (auto cus : route) {
-          chr.chr.push_back(cus);
+        chr.chr.push_back(cus);
       }
   }
   return chr;
@@ -286,138 +289,223 @@ Chromosome crossover_onepoint(const Chromosome &a, const Chromosome &b) {
   return ret;
 }
 
-std::pair<double, Chromosome> move_swap_point(Chromosome &chr) {
+std::pair<double, solutionRespent> move_swap_point(solutionRespent &cur_sol) {
   /// run pipeline after swap??
-  if (chr.chr.size() < 2)
-    return std::make_pair(-1, chr);
+  /// run swap inter route
+  auto sol = cur_sol;
+  sol.repair_flow();
+  for (int i = 0; i < sol.config.NUM_TRUCK; ++i) {
+    double cur_distance = travel_time(sol.truck_route[i], TRUCK, sol.config);
+    for (int j = 0; j + 1 < sol.truck_route[i].size(); ++j) {
+      std::swap(sol.truck_route[i][j], sol.truck_route[i][j + 1]);
 
-  double v = 0;
-  Chromosome best(chr);
+      double new_distance = travel_time(sol.truck_route[i], TRUCK, sol.config);
 
-  for (int i = 0; i < chr.chr.size(); ++i) {
-    for (int j = i + 1; j < chr.chr.size(); ++j) {
-      auto a = chr;
-      std::swap(a.chr[i], a.chr[j]);
-
-      auto tmp = decode_with_weight(a);
-      if (v < tmp.fitness()) {
-        v = tmp.fitness();
-        best = a;
+      if (cur_distance > new_distance) {
+        cur_distance = new_distance;
+      } else {
+        // If the new distance is not better, undo the swapf
+        std::swap(sol.truck_route[i][j], sol.truck_route[i][j + 1]);
       }
     }
   }
-  return pipeline(best);
-}
+  cur_sol = sol; /// auto run
 
-std::pair<double, Chromosome> move_swap_edge(Chromosome &chr) {
-  double v = 0;
-  Chromosome best(chr);
-  for (int i = 0; i < chr.chr.size(); ++i) {
-    for (int j = i + 2; j + 1 < chr.chr.size(); ++j) {
-      auto a = chr;
-
-      std::swap(a.chr[i], a.chr[j]);
-      std::swap(a.chr[i + 1], a.chr[j + 1]);
-      auto tmp = decode_with_weight(a);
-      if (v < tmp.fitness()) {
-        v = tmp.fitness();
-        best = a;
-      }
-    }
+  /// run swap intra route
+  const auto calc_adj = [&](std::vector<std::pair<int, int>> &route, int i, int cus, vehicle_types vh) {
+    return sol.config.time_travel(cus, (i > 0) ? route[i - 1].first : 0, vh) +
+           sol.config.time_travel(cus, i + 1 < (route.size() ? route[i + 1].first : 0), vh);
+  };
+  std::vector<double> cache_time_travel(sol.config.NUM_TRUCK, 0);
+  for (int i = 0; i < sol.config.NUM_TRUCK; ++i) {
+    cache_time_travel[i] = travel_time(sol.truck_route[i], TRUCK, sol.config);
   }
-  return pipeline(best);
-}
 
-std::pair<double, Chromosome> move_duplicate(Chromosome &chr) {
-  chr = pipeline(chr).second;
-  double v = 0;
-  std::cout << chr.chr.size() << '\n';
-  Chromosome best(chr);
+  for (int i = 0; i < sol.config.NUM_TRUCK; ++i) {
+    for (int j = 0; j < sol.truck_route[i].size(); ++j) {
+      for (int k = i + 1; k < sol.config.NUM_TRUCK; ++k) {
+        for (int t = 0; t < sol.truck_route[k].size(); ++t) {
+          /// try to swap j and t
+          double old_d1 = calc_adj(sol.truck_route[i], j, sol.truck_route[i][j].first, TRUCK);
+          double old_d2 = calc_adj(sol.truck_route[k], t, sol.truck_route[k][t].first, TRUCK);
+          double old_d = old_d + old_d2;
 
-  for (int i = 0; i < chr.chr.size(); ++i) {
-    for (int j = 0; j < chr.chr.size(); ++j) {
-      if (i == j)
-        continue;
+          double new_d1 = calc_adj(sol.truck_route[i], j, sol.truck_route[k][t].first, TRUCK);
+          double new_d2 = calc_adj(sol.truck_route[k], t, sol.truck_route[i][j].first, TRUCK);
+          double new_d = new_d1 + new_d2;
 
-      auto a = chr;
+          /// interchange w1 and w2
+          if (new_d < old_d) {
+            /// improve distance
 
-      if (chr.chr[i].second > chr.chr[j].second) {
-        std::swap(a.chr[i].first, a.chr[j].first);
-        a.chr[i].second -= a.chr[j].second;
-        a.chr.insert(a.chr.begin() + i, a.chr[j]);
+            /// checking distance constraint
+            if (cache_time_travel[i] - old_d1 + new_d1 < sol.config.time_limit(TRUCK) and
+                cache_time_travel[k] - old_d2 + new_d2 < sol.config.time_limit(TRUCK)) {
+              /// checking weight constraint
 
-        auto tmp = decode_with_weight(a);
-        if (v < tmp.fitness()) {
-          v = tmp.fitness();
-          best = a;
+              // if (sol.weight_truck[i] - sol.truck_route[i][j].second + sol.truck_route[k][t].second <=
+              //         sol.config.TRUCK_CAPACITY and
+              //     sol.weight_truck[k] - sol.truck_route[k][t].second + sol.truck_route[i][j].second <=
+              //         sol.config.TRUCK_CAPACITY) {
+              int a = sol.truck_route[i][j].first, b = sol.truck_route[k][t].first, wa = sol.truck_route[i][j].second,
+                  wb = sol.truck_route[k][t].second;
+              if (sol.current_deliver[a] - wa + wb >= sol.config.CUSTOMERS[a].lower_weight and
+                  sol.current_deliver[b] - wb + wa >= sol.config.CUSTOMERS[b].lower_weight) {
+                std::swap(sol.truck_route[i][j].first, sol.truck_route[k][t].first);
+
+                cache_time_travel[i] += -old_d1 + new_d1;
+                cache_time_travel[k] += -old_d2 + new_d2;
+
+                sol.current_deliver[a] += -wa + wb;
+                sol.current_deliver[b] += -wb + wa;
+              }
+            }
+          }
+        }
+      }
+
+      for (int k = 0; k < sol.config.NUM_DRONE; ++k) {
+        for (int dr_id = 0; dr_id < sol.drone_route[k].size(); ++dr_id) {
+          for (int t = 0; t < sol.drone_route[k][dr_id].size(); ++t) {
+            double old_d1 = calc_adj(sol.truck_route[i], j, sol.truck_route[i][j].first, TRUCK);
+            double old_d2 = calc_adj(sol.drone_route[k][dr_id], t, sol.drone_route[k][dr_id][t].first, DRONE);
+            double old_d = old_d + old_d2;
+
+            double new_d1 = calc_adj(sol.truck_route[i], j, sol.drone_route[k][dr_id][t].first, TRUCK);
+            double new_d2 = calc_adj(sol.drone_route[k][dr_id], t, sol.truck_route[i][j].first, DRONE);
+            double new_d = new_d1 + new_d2;
+
+            if (new_d < old_d) {
+              /// improve distance
+
+              /// checking distance constraint
+              if (cache_time_travel[i] - old_d1 + new_d1 < sol.config.time_limit(TRUCK) and
+                  travel_time(sol.drone_route[k][dr_id], DRONE, sol.config) - old_d2 + new_d2 <
+                      sol.config.time_limit(DRONE)) {
+                /// checking weight constraint
+                // if (sol.weight_truck[i] - sol.truck_route[i][j].second + sol.drone_route[k][dr_id][t].second <=
+                //         sol.config.TRUCK_CAPACITY and
+                //     sol.weight_drone[k][dr_id] - sol.drone_route[k][dr_id][t].second + sol.truck_route[i][j].second
+                //     <=
+                //         sol.config.DRONE_CAPACITY) {
+
+                int a = sol.truck_route[i][j].first, b = sol.drone_route[k][dr_id][t].first,
+                    wa = sol.drone_route[k][dr_id][t].second, wb = sol.drone_route[k][dr_id][t].second;
+                if (sol.current_deliver[a] - wa + wb >= sol.config.CUSTOMERS[a].lower_weight and
+                    sol.current_deliver[b] - wb + wa >= sol.config.CUSTOMERS[b].lower_weight) {
+                  std::swap(sol.truck_route[i][j].first, sol.drone_route[k][dr_id][t].first);
+
+                  cache_time_travel[i] += -old_d1 + new_d1;
+
+                  // sol.weight_truck[i] += -sol.truck_route[i][j].second + sol.truck_route[k][t].second;
+                  // sol.weight_drone[k][dr_id] += -sol.drone_route[k][dr_id][t].second + sol.truck_route[i][j].second;
+                  // }
+
+                  sol.current_deliver[a] += -wa + wb;
+                  sol.current_deliver[b] += -wa + wb;
+                }
+              }
+            }
+          }
         }
       }
     }
   }
-  return pipeline(best);
+
+  sol.repair_flow();
+  sol.push_remain_cus();
+  sol.repair_flow();
+  sol.normalize();
+
+  return {sol.fitness(), sol};
 }
 
-std::pair<double, Chromosome> move_erase(Chromosome &chr) {
-  chr = pipeline(chr).second;
-  double v = 0;
-  Chromosome best(chr);
+std::pair<double, solutionRespent> move_swap_edge(solutionRespent &cur_sol) {
+  // auto sol = cur_sol;
+  // sol.repair_flow();
 
-  std::cerr << chr.chr.size() << '\n';
+  // for (int i = 0; i < sol.config.NUM_TRUCK; ++i) {
+  //   double cur_distance = travel_time(sol.truck_route[i], TRUCK, sol.config);
+  //   for (int j = 0; j + 1 < sol.truck_route[i].size(); ++j) {
+  //     std::swap(sol.truck_route[i][j], sol.truck_route[i][j + 1]);
 
-  for (int i = 0; i < chr.chr.size(); ++i) {
-    for (int j = 0; j < chr.chr.size(); ++j) {
-      for (int k = 0; k < chr.chr.size(); ++k) {
-        if (i == j)
-          continue;
-        if (i == j + 1)
-          continue;
-        if (j == i + 1)
-          continue;
-        if (k == i or k == i + 1 or k == j or k == j + 1)
-          continue;
+  //     double new_distance = travel_time(sol.truck_route[i], TRUCK, sol.config);
 
-        auto a = chr;
+  //     if (cur_distance > new_distance) {
+  //       cur_distance = new_distance;
+  //     } else {
+  //       // If the new distance is not better, undo the swapf
+  //       std::swap(sol.truck_route[i][j], sol.truck_route[i][j + 1]);
+  //     }
+  //   }
+  // }
 
-        a.chr.erase(a.chr.begin() + k);
+  return {cur_sol.fitness(), cur_sol};
+}
 
-        a.chr.insert(a.chr.begin() + i + 1, chr.chr[k]);
-        a.chr.insert(a.chr.begin() + j + 1 + (i < j), chr.chr[k]);
+std::pair<double, solutionRespent> move_duplicate(solutionRespent &cur_sol) {
+  auto sol = cur_sol;
+  sol.repair_flow();
+  const auto calc_adj = [&](std::vector<std::pair<int, int>> &route, int i, int cus, vehicle_types vh) {
+    return sol.config.time_travel(cus, (i > 0) ? route[i - 1].first : 0, vh) +
+           sol.config.time_travel(cus, i + 1 < (route.size() ? route[i + 1].first : 0), vh);
+  };
+  std::vector<double> cache_time_travel(sol.config.NUM_TRUCK, 0);
+  for (int i = 0; i < sol.config.NUM_TRUCK; ++i) {
+    cache_time_travel[i] = travel_time(sol.truck_route[i], TRUCK, sol.config);
+  }
 
-        auto tmp = decode_with_weight(a);
-        if (v < tmp.fitness()) {
-          v = tmp.fitness();
-          best = a;
-          // return pispeline(best);
+  for (int i = 0; i < sol.config.NUM_TRUCK; ++i) {
+    for (int j = 0; j < sol.truck_route[i].size(); ++j) {
+      for (int k = i + 1; k < sol.config.NUM_TRUCK; ++k) {
+        for (int t = 0; t < sol.truck_route[k].size(); ++t) {
+          /// try to swap j and t
+          /// try to duplicate
+          if (sol.truck_route[i][j].second > sol.truck_route[k][t].second) {
+            /// k, t become i, j -> insert k t to prev of i, j, (i ,j) reassign weight
+            /// old1 is cost of insert k, t into prev i, j
+            double old_d1 = 0;
+            double old_d2 = calc_adj(sol.truck_route[k], t, sol.truck_route[k][t].first, TRUCK);
+            double old_d = old_d + old_d2;
+
+            double new_d1 = insert((j > 0) ? sol.truck_route[i][j - 1].first : 0, sol.truck_route[i][j].first,
+                                   sol.truck_route[k][t].first, TRUCK, sol.config);
+            double new_d2 = calc_adj(sol.truck_route[k], t, sol.truck_route[i][j].first, TRUCK);
+            double new_d = new_d1 + new_d2;
+
+            // if (new_d < old_d) {
+            /// improve distance
+
+            /// checking distance constraint
+            if (cache_time_travel[i] - old_d1 + new_d1 < sol.config.time_limit(TRUCK) and
+                cache_time_travel[k] - old_d2 + new_d2 < sol.config.time_limit(TRUCK)) {
+              /// checking weight constraint
+              // std::cout << i  << ' ' << j << ' ' << k << ' ' << t << '\n';
+              // std::cout << "prv\n";
+              // sol.print();
+              int base = sol.truck_route[i][j].second;
+              std::swap(sol.truck_route[i][j].first, sol.truck_route[k][t].first);
+              sol.truck_route[i][j].second = sol.truck_route[k][t].second;
+              sol.truck_route[i].insert(sol.truck_route[i].begin() + j + 1,
+                                        {sol.truck_route[k][t].first, base - sol.truck_route[k][t].second});
+
+              cache_time_travel[i] += -old_d1 + new_d1;
+              cache_time_travel[k] += -old_d2 + new_d2;
+            }
+            // }
+          }
         }
       }
     }
   }
-  return pipeline(best);
+  sol.repair_flow();
+  sol.push_remain_cus();
+  sol.repair_flow();
+  sol.normalize();
+  return {sol.fitness(), sol};
 }
 
-// std::pair<double, Chromosome> move_swap_edge(Chromosome &chr) {
-//   /// run pipeline after swap??
-//   if (chr.chr.size() < 2)
-//     return std::make_pair(-1, chr);
-
-//   double v = 0;
-//   Chromosome best(chr);
-
-//   for (int i = 0; i + 1 < chr.chr.size(); ++i) {
-//     for (int j = 0; j < chr.chr.size(); ++j) {
-//       if (j == i or j == i + 1) continue;
-//       auto a = chr;
-//       std::swap(a.chr[i], a.chr[j]);
-
-//       auto tmp = pipeline(a);
-//       if (v < tmp.first) {
-//         v = tmp.first;
-//         best = a;
-//       }
-//     }
-//   }
-//   return pipeline(chr);
-// }
+std::pair<double, Chromosome> move_erase(Chromosome &chr) {}
 
 GA::GA(globalSetting &conf) { config = conf; }
 
@@ -426,7 +514,11 @@ void GA::init_population() {
   for (int i = 0; i < config.POPULATION_SIZE; ++i) {
     solutionRespent sol(config);
     sol.init_by_distance();
-    sol.repair_flow(); sol.push_remain_cus(); sol.repair_flow();
+    sol.repair_flow();
+    sol.push_remain_cus();
+    sol.repair_flow();
+    sol.normalize();
+    // sol.print();
     population.push_back(encoding(sol));
   }
 }
@@ -471,7 +563,6 @@ void GA::local_search_mutation() {
     // print_out(population[r].chr);
 
     population[r] = local_search(population[r]);
-    break;
   }
 }
 
@@ -502,15 +593,19 @@ void GA::mutation_process() {
 
 void GA::ga_process() {
   init_population();
+
   for (int i = 0; i < config.GA_ITER; ++i) {
-    std::cout << "start generation " << i << '\n';
+    // std::cout << "start generation " << i << '\n';
+    // std::cout << pipeline(population[0]).first << '\n';
     choose_next_population();
-    std::cout << "done next population\n";
+    // std::cout << "done next population\n";
     mutation_process();
-    std::cout << "done mutation\n";
+    // std::cout << "done mutation\n";
 
     if (i % config.MUT_LOCALSEARCH_ITER == 0) {
       local_search_mutation();
     }
+
+    // std::cout << pipeline(population[0]).first << '\n';
   }
 }

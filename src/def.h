@@ -73,6 +73,7 @@ public:
   void local_search();
   void move_11();
   void move_10();
+  void normalize();
   /// to handle pushing process
 };
 
