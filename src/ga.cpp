@@ -81,10 +81,11 @@ solutionRespent decoding(Chromosome &chr) {
   double cur_travel_time = 0, cur_system_time = 0;
   int prv_cus = 0;
   bool is_empty = true;
+  int cur_weight = 0;
 
   for (auto gen : chr.chr) {
     /// std::cout << cus << ' ';
-    auto cus = gen.first;
+    auto cus = gen.first, weight = gen.second; weight = 0;
     while (true) {
       if (current_vehicle >= chr.config.NUM_TRUCK + chr.config.NUM_DRONE)
         break;
@@ -98,7 +99,7 @@ solutionRespent decoding(Chromosome &chr) {
       bool next_trip = false;
 
       if (current_vehicle < chr.config.NUM_TRUCK) {
-        if (prv_cus != cus and ncur_travel_time < chr.config.TIME_LIMIT) {
+        if (prv_cus != cus and ncur_travel_time < chr.config.TIME_LIMIT and cur_weight + weight <= chr.config.TRUCK_CAPACITY) {
           cur_travel_time = ncur_travel_time;
           cur_system_time = ncur_system_time;
           prv_cus = cus;
@@ -109,7 +110,7 @@ solutionRespent decoding(Chromosome &chr) {
         }
       } else {
         if (prv_cus != cus and ncur_travel_time < chr.config.TIME_LIMIT and
-            ncur_system_time < chr.config.DRONE_DURATION) {
+            ncur_system_time < chr.config.DRONE_DURATION and cur_weight + weight <= chr.config.DRONE_CAPACITY) {
           cur_travel_time = ncur_travel_time;
           cur_system_time = ncur_system_time;
           prv_cus = cus;
@@ -126,6 +127,7 @@ solutionRespent decoding(Chromosome &chr) {
         prv_cus = 0;
         if (cur_vehicle_type == TRUCK) {
           cur_system_time = 0;
+          cur_weight = 0;
         } else {
           if (is_empty) {
             current_vehicle++;
@@ -133,7 +135,9 @@ solutionRespent decoding(Chromosome &chr) {
             cur_system_time = 0;
             cur_travel_time = 0;
             is_empty = true;
+            cur_weight = 0;
           } else {
+            cur_weight = 0;
             is_empty = true;
             cur_travel_time = 0;
           }
@@ -149,7 +153,8 @@ solutionRespent decoding(Chromosome &chr) {
       break;
     is_empty = false;
     if (current_vehicle < chr.config.NUM_TRUCK) {
-      sol.truck_route[current_vehicle].emplace_back(cus, 0);
+      sol.truck_route[current_vehicle].emplace_back(cus, weight);
+      cur_weight += weight;
     } else {
       if (trip_id == sol.drone_route[current_vehicle - chr.config.NUM_TRUCK].size()) {
         std::vector<std::pair<int, int>> r;
@@ -161,7 +166,8 @@ solutionRespent decoding(Chromosome &chr) {
       // std::cout << current_vehicle << '\n';
       // std::cout << "trip_id" << ' ' << trip_id << ' ' << sol.drone_route[current_vehicle -
       // chr.config.NUM_TRUCK].size() << '\n';
-      sol.drone_route[current_vehicle - chr.config.NUM_TRUCK][trip_id].emplace_back(cus, 0);
+      sol.drone_route[current_vehicle - chr.config.NUM_TRUCK][trip_id].emplace_back(cus, weight);
+      cur_weight += weight;
       // std::cout << "drone\n";
     }
   }
@@ -351,6 +357,8 @@ std::pair<double, solutionRespent> move_swap_point(solutionRespent &cur_sol) {
                   wb = sol.truck_route[k][t].second;
               if (sol.current_deliver[a] - wa + wb >= sol.config.CUSTOMERS[a].lower_weight and
                   sol.current_deliver[b] - wb + wa >= sol.config.CUSTOMERS[b].lower_weight) {
+                if (sol.current_deliver[a] - wa + wb > sol.config.CUSTOMERS[a].upper_weight or
+                    sol.current_deliver[b] - wb + wa > sol.config.CUSTOMERS[b].upper_weight) continue;
                 std::swap(sol.truck_route[i][j].first, sol.truck_route[k][t].first);
 
                 cache_time_travel[i] += -old_d1 + new_d1;
@@ -393,6 +401,8 @@ std::pair<double, solutionRespent> move_swap_point(solutionRespent &cur_sol) {
                     wa = sol.drone_route[k][dr_id][t].second, wb = sol.drone_route[k][dr_id][t].second;
                 if (sol.current_deliver[a] - wa + wb >= sol.config.CUSTOMERS[a].lower_weight and
                     sol.current_deliver[b] - wb + wa >= sol.config.CUSTOMERS[b].lower_weight) {
+                if (sol.current_deliver[a] - wa + wb > sol.config.CUSTOMERS[a].upper_weight or
+                    sol.current_deliver[b] - wb + wa > sol.config.CUSTOMERS[b].upper_weight) continue;
                   std::swap(sol.truck_route[i][j].first, sol.drone_route[k][dr_id][t].first);
 
                   cache_time_travel[i] += -old_d1 + new_d1;

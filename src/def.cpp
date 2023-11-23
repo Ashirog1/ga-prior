@@ -24,7 +24,7 @@ double globalSetting::time_limit(vehicle_types vehicle_type) {
 }
 
 double globalSetting::euclid_distance(const Customer &a, const Customer &b) {
-  return sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y) + 0.5);
+  return sqrt((a.x - b.x) * (a.x - b.x) + (a.y - b.y) * (a.y - b.y));
 }
 
 double globalSetting::time_travel(const int &a, const int &b, vehicle_types vehicle_type) {
@@ -39,6 +39,7 @@ void globalSetting::read_input() {
   NUM_CUSTOMER = 1;
   CUSTOMERS.emplace_back(Customer());
   while (std::cin >> tmp.x >> tmp.y >> tmp.lower_weight >> tmp.upper_weight >> tmp.cost) {
+    tmp.lower_weight = std::max(1, tmp.lower_weight);
     CUSTOMERS.emplace_back(tmp);
     NUM_CUSTOMER++;
   }
@@ -75,6 +76,8 @@ void solutionRespent::init_empty() {
   truck_route.resize(config.NUM_TRUCK, TRoute());
   drone_route.resize(config.NUM_DRONE);
   current_deliver.resize(config.NUM_CUSTOMER, 0);
+  weight_truck.resize(config.NUM_TRUCK, 0);
+  weight_drone.resize(config.NUM_DRONE);
 }
 /// @brief init by angle
 
@@ -231,7 +234,18 @@ void solutionRespent::repair_flow() {
 }
 
 void solutionRespent::push_remain_cus() {
+  std::vector<int> order;
   for (int i = 1; i < config.NUM_CUSTOMER; ++i) {
+    order.push_back(i);
+  }
+  std::sort(order.begin(), order.end(), [&](int u, int v) {
+    double gainu = (config.CUSTOMERS[u].lower_weight - current_deliver[u]) * config.CUSTOMERS[u].cost;
+    double gainv = (config.CUSTOMERS[v].lower_weight - current_deliver[v]) * config.CUSTOMERS[v].cost;
+    return config.euclid_distance(config.CUSTOMERS[u], config.CUSTOMERS[0]) / gainu <
+           config.euclid_distance(config.CUSTOMERS[v], config.CUSTOMERS[0]) / gainv;
+  });
+  for (int c = 0; c < order.size(); ++c) {
+    int i = order[c];
     if (current_deliver[i] < config.CUSTOMERS[i].lower_weight) {
       int rem_weight = config.CUSTOMERS[i].lower_weight - current_deliver[i];
       while (rem_weight > 0) {
@@ -320,7 +334,14 @@ void solutionRespent::push_remain_cus() {
       }
     }
   }
-  for (int i = 1; i < config.NUM_CUSTOMER; ++i) {
+  std::sort(order.begin(), order.end(), [&](int u, int v) {
+    double gainu = (config.CUSTOMERS[u].upper_weight - current_deliver[u]) * config.CUSTOMERS[u].cost;
+    double gainv = (config.CUSTOMERS[v].upper_weight - current_deliver[v]) * config.CUSTOMERS[v].cost;
+    return config.euclid_distance(config.CUSTOMERS[u], config.CUSTOMERS[0]) / gainu <
+           config.euclid_distance(config.CUSTOMERS[v], config.CUSTOMERS[0]) / gainv;
+  });
+  for (int c = 0; c < order.size(); ++c) {
+    int i = order[c];
     if (current_deliver[i] < config.CUSTOMERS[i].upper_weight) {
       int rem_weight = config.CUSTOMERS[i].upper_weight - current_deliver[i];
       while (rem_weight > 0) {
@@ -456,7 +477,8 @@ double solutionRespent::fitness() {
       drone_travel_time += travel_time(drone_route[i][r], DRONE, config);
     }
   }
-  return evaluate() -truck_travel_time * config.WDTRUCK - drone_travel_time * config.WDDRONE;
+  return evaluate();
+  return evaluate() - truck_travel_time * config.WDTRUCK - drone_travel_time * config.WDDRONE;
 }
 
 bool solutionRespent::is_valid() {
@@ -477,7 +499,8 @@ bool solutionRespent::is_valid() {
     for (int r = 0; r < drone_route[i].size(); ++r) {
       int tmp = travel_time(drone_route[i][r], DRONE, config);
       drone_travel_time += tmp;
-      if (tmp > config.TIME_LIMIT) return false;
+      if (tmp > config.TIME_LIMIT)
+        return false;
     }
     if (drone_travel_time > config.DRONE_DURATION)
       return false;

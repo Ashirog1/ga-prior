@@ -34,11 +34,9 @@ inline std::pair<double, Chromosome> pipeline(Chromosome&chr) {
   // std::cout << chr.chr.size() << '\n';
   sol.push_remain_cus();
 
-  sol.repair_flow();
+  sol.repair_flow(); sol.normalize();
 
-  sol.normalize();
-
-
+  
   if (not sol.is_valid()) return {sol.fitness() - 10000000,encoding(sol) };
 
   return {sol.fitness(), encoding(sol)};
@@ -70,12 +68,12 @@ inline Chromosome local_search(Chromosome &chr) {
     auto tmp = sol.fitness();
 
     auto nxt1 = move_swap_point(sol);
-    // auto nxt2 = move_duplicate(sol);
+    auto nxt2 = move_duplicate(sol);
 
     // if (nxt1.first < nxt2.first) std::swap(nxt1, nxt2);
-    sol = nxt1.second;
-    if (nxt1.first <= tmp) break;
-
+    if (std::max(nxt1.first, nxt2.first) <= tmp) break;
+    if (nxt1.first < nxt2.first) sol = nxt2.second;
+    else sol = nxt1.second;
   }
   return encoding(sol);
 }
